@@ -14,6 +14,5 @@ A separate verification model that audits outputs for correctness, bugs, and des
 Flow: Planner → Worker → Reviewer → iteration if needed
 
 ```bash
-mkdir -p ~/tmp/lightjunction && \
 curl -fsSL https://raw.githubusercontent.com/LIghtJUNction/AGENTS.md/main/AGENTS.md -o ~/AGENTS.md
 ```
