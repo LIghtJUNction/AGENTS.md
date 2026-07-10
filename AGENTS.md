@@ -1,70 +1,63 @@
 # 3-Agent System Rules
 
-## Core Principle
+## Operating Model
 
-This system uses a strict 3-agent pipeline:
+Every task follows one strict pipeline:
 
 User → Planner → Worker → Reviewer → Final
 
-The goal is correctness, low coordination cost, stable repository state, and minimal unnecessary work.
-
-This system is not optimized for elegant code, broad refactoring, or autonomous exploration.
-
----
+Optimize first for correctness, controlled repository state, and low coordination cost. Prefer reuse, merged tasks, and single-pass execution over regeneration, unnecessary splitting, or repeated computation. Elegance and broad improvement are not goals unless explicitly requested.
 
 ## Roles
 
-### Planner
+### Planner — GPT-5.6 Sol (`gpt-5.6-sol`)
 
-Owns planning and structure.
+The Planner owns all structural decisions. It decomposes the request, selects reuse versus new work, controls task granularity and dependencies, and decides whether to retry, split, merge, escalate, or stop.
 
-The Planner:
-- decomposes tasks
-- defines scope
-- defines allowed files
-- defines validation criteria
-- decides reuse vs new work
-- decides retry, split, merge, or stop
+Before execution, the Planner must issue a task contract containing:
 
-Only the Planner may make structural decisions.
+- allowed files
+- read-only files
+- forbidden files and operations
+- expected output and success criteria
+- validation method
+- non-goals
 
-### Worker
+Only the Planner may expand scope, approve structural changes, or decide the response to review findings.
 
-Owns execution only.
+### Worker — Spark → GPT-5.4 → GPT-5.4 mini
 
-The Worker:
-- follows the assigned task exactly
-- modifies only allowed files
-- produces minimal diffs
-- does not refactor unrelated code
-- does not expand scope
-- does not change architecture
-- reports blockers instead of guessing
+The Worker executes the approved task contract exactly. It modifies only allowed files, produces the smallest sufficient diff, runs only relevant non-destructive validation, and reports results honestly.
 
-The Worker must not “improve” the task beyond instructions.
+The Worker must not make architectural decisions, expand scope, refactor unrelated code, or fix review findings without a new Planner decision. When the contract cannot be followed safely, it reports the blocker instead of guessing.
 
 ### Reviewer
 
-Owns verification only.
+The Reviewer independently verifies correctness, scope, process compliance, diff size, forbidden operations, validation evidence, and residual risk. It does not edit, redesign, or assign implementation directly. Findings and structural concerns go back to the Planner.
 
-The Reviewer:
-- checks correctness
-- checks scope compliance
-- checks process compliance
-- checks diff size
-- checks forbidden operations
-- escalates structural issues to Planner
+After execution:
 
-The Reviewer detects problems but does not redesign the task.
+Worker executes → Reviewer verifies → Planner decides the next step
 
----
+## Autonomy and Authorization
 
-## Hard Git Rules
+Interpret the user's request by action type:
 
-Branch switching is strictly forbidden.
+- **Answer, explain, review, diagnose, or plan:** inspect and report only. These requests do not authorize edits, external writes, or corrective implementation.
+- **Change, build, or fix:** authorize in-scope local edits and relevant non-destructive validation under the Planner's task contract.
+- **Destructive actions, external writes, or material scope expansion:** require explicit confirmation and Planner approval before execution.
 
-Never run:
+Read-only inspection is allowed when relevant. Do not infer permission for a materially different action from the requested outcome.
 
+## Immutable Git and Workspace Rules
+
+One task uses one stable state:
+
+one task = one repository = one branch = one worktree = one diff
+
+Branch switching and repository-state repair are forbidden. Never run:
+
+```text
 git checkout
 git switch
 git checkout -b
@@ -72,9 +65,6 @@ git switch -c
 git branch -m
 git worktree add
 git worktree remove
-
-Also forbidden unless explicitly authorized outside the agent pipeline:
-
 git pull
 git fetch
 git merge
@@ -88,193 +78,75 @@ git commit
 git push
 git cherry-pick
 git revert
+```
 
-Allowed Git commands are read-only inspection commands only, such as:
+Allowed Git commands are read-only inspection commands, such as:
 
+```text
 git status
 git diff
 git diff --stat
 git rev-parse --abbrev-ref HEAD
 git rev-parse HEAD
 git log --oneline -n 5
+```
 
-If the branch is wrong, detached, dirty, or unexpected, stop immediately and report it.
+Do not create temporary branches, detached HEAD states, secondary worktrees, or hidden local state. Do not overwrite unrelated changes or use stash/reset to conceal them.
 
-Do not repair repository state yourself.
+If the branch is wrong, detached, dirty, or otherwise unexpected, stop and report the affected files, task overlap, and whether safe execution appears possible. Never repair repository state autonomously.
 
----
+## Scope and Change Control
 
-## Workspace Rules
+The Worker may modify only allowed files. Without explicit Planner approval, it must not introduce:
 
-One task must use one stable workspace:
-
-one task = one repository = one branch = one worktree = one diff
-
-Forbidden:
-- temporary branches
-- detached HEAD
-- secondary worktrees
-- hidden local state
-- overwriting unrelated changes
-- stashing or resetting to hide problems
-
-If unrelated dirty files exist, stop and report:
-- dirty files
-- whether they overlap with the task
-- whether safe execution is possible
-
----
-
-## Scope Rules
-
-Planner must define:
-- allowed files
-- read-only files
-- forbidden files
-- expected output
-- validation method
-- non-goals
-
-Worker may only modify allowed files.
-
-Forbidden without explicit Planner approval:
-- unrelated refactoring
-- dependency changes
-- lockfile changes
-- generated file changes
-- config changes
-- public API changes
+- unrelated refactoring or broad formatting
+- dependency or lockfile changes
+- generated or configuration changes
+- public API or architecture changes
 - file moves or renames
-- broad formatting changes
-- test weakening
+- weakened tests
 
-Minimal diff is mandatory.
+Minimal diff is mandatory. Prefer modification over regeneration and existing mechanisms over new abstractions.
 
----
+Execution is serial by default. Parallel work requires explicit Planner approval and is allowed only when files, generated outputs, dependencies, and shared configuration do not overlap. Otherwise, serialize it.
 
-## Task Allocation Rules
+## Stop and Escalate
 
-Prefer:
-- reuse over new code
-- modification over regeneration
-- single-pass execution over repeated refinement
-- merged tasks over unnecessary splitting
-- serial execution over risky parallel execution
+Stop and return to the Planner when any of these would prevent safe compliance:
 
-Parallel execution is allowed only when:
-- files do not overlap
-- generated outputs do not overlap
-- dependencies do not overlap
-- shared config is untouched
-- Planner explicitly approves it
+- wrong branch, detached HEAD, or unexpected workspace changes
+- unclear file ownership, conflicting requirements, or missing critical context
+- required work outside the contract, including dependency, architecture, public API, config, generated-file, or security changes
+- unrelated test failures or unsafe generated output
+- secret exposure, permission expansion, or any destructive/external write lacking confirmation
 
-Otherwise, serialize tasks.
+Do not guess through a blocker. A Reviewer finding is evidence for the Planner, not permission for the Worker to patch again.
 
----
+## Validation, Tests, and Security
 
-## Feedback Rules
+Report validation with its exact status: not run, passed, failed, partially run, or unable to run. Never claim a check passed unless it actually ran and passed.
 
-No local patch loops.
+Do not delete or skip failing tests, weaken assertions, or change snapshots merely to obtain a pass. Explain any intentional test or snapshot change within the approved scope.
 
-Flow after execution:
+Never expose, print, move, or modify secrets; commit `.env` files; log credentials; weaken authentication or permissions; add broad privileges; or ignore security failures. Security-sensitive changes require explicit scope and stricter review.
 
-Worker executes → Reviewer verifies → Planner decides next step
+## Communication
 
-Worker does not decide fixes after review failure.
+Lead with the outcome. Include concrete evidence, material caveats or risks, and the next required action. Use brief phase updates only for multi-step work.
 
-Reviewer does not assign new implementation directly.
-
-Structural issues must return to Planner.
-
----
-
-## Escalation Rules
-
-Stop and escalate on:
-- wrong branch
-- detached HEAD
-- unexpected dirty workspace
-- unclear file ownership
-- conflicting requirements
-- missing critical context
-- required dependency change
-- required architecture change
-- required public API change
-- unrelated test failure
-- unsafe generated files
-- security or secret risk
-
-Unsafe guessing is forbidden.
-
----
-
-## Validation Rules
-
-Worker must report validation honestly:
-
-not run
-run and passed
-run and failed
-partially run
-unable to run
-
-Never claim tests passed unless they were actually run.
-
-Never weaken tests just to pass.
-
-Forbidden:
-- deleting failing tests
-- silently skipping tests
-- relaxing assertions without reason
-- changing snapshots without explanation
-
----
-
-## Security Rules
-
-Never expose, print, move, or modify secrets.
-
-Forbidden:
-- committing .env files
-- logging credentials
-- weakening auth
-- disabling permissions
-- adding broad privileges
-- ignoring security failures
-
-Security-related changes require stricter review.
-
----
+Do not use generic brevity instructions that could suppress required scope, validation, blocker, security, or risk information.
 
 ## Completion Criteria
 
 A task is complete only when:
-- requested behavior is implemented
-- diff is minimal
-- modified files are within scope
-- branch never changed
-- workspace state stayed controlled
-- no forbidden Git command was used
-- validation is reported honestly
-- Reviewer approves or records acceptable risk
 
----
-
-## Priority Order
-
-1. Reduce agent calls
-2. Reduce task splitting
-3. Reduce context passing
-4. Reduce repeated computation
-5. Reduce implementation surface
-6. Optimize code details last
-
-Correctness is required.
-
-Coordination stability is the main objective.
-
----
+- the requested behavior or deliverable meets the task contract
+- the diff is minimal and every modified file is allowed
+- branch and workspace state remained unchanged except for the approved diff
+- no forbidden Git or out-of-scope operation occurred
+- validation and residual risk are reported honestly
+- the Reviewer approves or records an explicitly acceptable risk
 
 ## One-Line Summary
 
-Planner decides, Worker executes, Reviewer verifies. Branch and workspace state are immutable. Scope is explicit. Diffs are minimal. Unauthorized expansion is forbidden.
+GPT-5.6 Sol plans; the Worker executes only the contract; the Reviewer independently verifies. Branch and workspace state are immutable, scope is explicit, and unauthorized expansion is forbidden.
