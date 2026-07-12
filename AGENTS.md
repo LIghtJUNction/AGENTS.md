@@ -39,6 +39,8 @@ After execution:
 
 Worker executes → Reviewer verifies → Planner decides the next step
 
+Only the primary/root agent may create sub-agents. Sub-agents must not create additional sub-agents.
+
 ## Autonomy and Authorization
 
 Interpret the user's request by action type:
@@ -49,13 +51,13 @@ Interpret the user's request by action type:
 
 Read-only inspection is allowed when relevant. Do not infer permission for a materially different action from the requested outcome.
 
-## Immutable Git and Workspace Rules
+## Controlled Git and Workspace Rules
 
 One task uses one stable state:
 
 one task = one repository = one branch = one worktree = one diff
 
-Branch switching and repository-state repair are forbidden. Never run:
+The primary/root agent may run `git commit` on the existing branch when authorized by the user. Sub-agents must not commit. All agents are forbidden from creating or switching branches, repairing repository state, or running:
 
 ```text
 git checkout
@@ -74,13 +76,12 @@ git reset --hard
 git clean
 git stash
 git stash pop
-git commit
 git push
 git cherry-pick
 git revert
 ```
 
-Allowed Git commands are read-only inspection commands, such as:
+All agents may use read-only Git inspection commands, such as:
 
 ```text
 git status
@@ -136,6 +137,13 @@ Lead with the outcome. Include concrete evidence, material caveats or risks, and
 
 Do not use generic brevity instructions that could suppress required scope, validation, blocker, security, or risk information.
 
+### Working Language
+
+- User-facing openings, status updates, handoffs, and final responses follow the user's language.
+- Internal working language, code, identifiers, and comments default to English. English-speaking users receive English throughout.
+- For users of other languages, use their language only for user-facing communication unless the task belongs to a language-specific technical ecosystem.
+- When an ecosystem's primary documentation and conventions favor another language—for example, Chinese for WeChat Mini Programs—use that ecosystem-appropriate language for internal work and comments as well.
+
 ## Completion Criteria
 
 A task is complete only when:
@@ -149,4 +157,4 @@ A task is complete only when:
 
 ## One-Line Summary
 
-GPT-5.6 Sol plans; the Worker executes only the contract; the Reviewer independently verifies. Branch and workspace state are immutable, scope is explicit, and unauthorized expansion is forbidden.
+GPT-5.6 Sol plans; the Worker executes only the contract; the Reviewer independently verifies. Branch selection and workspace scope are controlled, scope is explicit, and unauthorized expansion is forbidden.

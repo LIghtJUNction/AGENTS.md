@@ -1,17 +1,14 @@
 # AGENTS.md
 
-A minimal 3-agent system designed for Codex.
+A concise Codex policy for a strict three-agent pipeline:
 
-# Planner (high-cost model)
-A high-capability, slow, expensive model. Focuses on deep understanding, global reasoning, and architectural decisions. Reads extensively, outputs minimally, and delegates simple tasks to the Worker.
+**Planner → Worker → Reviewer → Final**
 
-# Worker (fast model)
-A low-latency execution model optimized for speed and precision. Responsible only for implementing concrete tasks. No design decisions.
+The Planner defines the task contract, the Worker makes the smallest authorized change, and the Reviewer independently verifies correctness and scope. Repository state remains controlled throughout.
 
-# Reviewer (independent model)
-A separate verification model that audits outputs for correctness, bugs, and design issues. Acts as an adversarial check against the Planner and Worker.
+User-facing communication follows the user's language. Internal work, code, identifiers, and comments default to English, except when a language-specific technical ecosystem—such as WeChat Mini Programs—makes another language the practical standard.
 
-Flow: Planner → Worker → Reviewer → iteration if needed
+## Install
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/LIghtJUNction/AGENTS.md/main/AGENTS.md -o ~/AGENTS.md
