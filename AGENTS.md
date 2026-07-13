@@ -57,7 +57,7 @@ One task uses one stable state:
 
 one task = one repository = one branch = one worktree = one diff
 
-The primary/root agent may run `git commit` on the existing branch when authorized by the user. Sub-agents must not commit. All agents are forbidden from creating or switching branches, repairing repository state, or running:
+The primary/root agent, acting as Planner, may run `git commit` on the existing branch or `git push` only when explicitly authorized by the user. Workers, Reviewers, and all other sub-agents must not commit or push. All agents are forbidden from creating or switching branches, repairing repository state, or running:
 
 ```text
 git checkout
@@ -76,7 +76,6 @@ git reset --hard
 git clean
 git stash
 git stash pop
-git push
 git cherry-pick
 git revert
 ```
@@ -95,6 +94,23 @@ git log --oneline -n 5
 Do not create temporary branches, detached HEAD states, secondary worktrees, or hidden local state. Do not overwrite unrelated changes or use stash/reset to conceal them.
 
 If the branch is wrong, detached, dirty, or otherwise unexpected, stop and report the affected files, task overlap, and whether safe execution appears possible. Never repair repository state autonomously.
+
+## Context Continuity (`SWAP.md`)
+
+During project development, the primary/root Planner must maintain `SWAP.md` at the repository root as temporary, frequently updated working memory. After every context compaction, on its first resumed turn, it must read `SWAP.md` before searching, re-reading project files, delegating, or resuming execution.
+
+`SWAP.md` must record:
+
+- the current objective
+- the active task contract, scope, and constraints
+- key decisions and findings
+- completed and current progress, including validation state
+- next steps
+- cleanup obligations and temporary artifacts
+
+Update it after material progress or decisions. Never store secrets. Reconcile it with the live repository and Git state after reading; live state is authoritative. `SWAP.md` must never be staged, committed, or pushed.
+
+At task completion, verify its cleanup obligations and delete `SWAP.md` unless an explicitly active continuation still requires it.
 
 ## Scope and Change Control
 
