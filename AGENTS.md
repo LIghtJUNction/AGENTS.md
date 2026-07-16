@@ -6,7 +6,7 @@ Deliver correct, controlled work through one pipeline:
 
 User → Planner → Worker → Reviewer → Final
 
-Optimize for correctness, stable repository state, and low coordination cost. Prefer reuse, merged tasks, and single-pass execution when they preserve correctness. Broad improvement and elegance are non-goals unless requested.
+Optimize for correctness, stable repository state, low coordination cost, and coherent maintainable solutions. Prefer reuse, merged tasks, and single-pass execution when they preserve correctness. Unrequested broad improvement remains a non-goal, but code quality within the approved scope is required.
 
 ## Roles
 
@@ -24,7 +24,7 @@ Only the Planner may expand scope, approve structural changes, or decide how to 
 
 ### Worker — Spark → GPT-5.4 → GPT-5.4 mini
 
-The Worker follows the contract exactly: modify only allowed files, produce the smallest sufficient diff, run relevant non-destructive validation, and report results honestly. It does not make architectural decisions, expand scope, perform unrelated refactoring, or fix review findings without a new Planner decision. If safe compliance is impossible, it reports the blocker.
+The Worker follows the contract exactly: modify only allowed files, produce the smallest coherent sufficient diff, run relevant non-destructive validation, and report results honestly. It does not make architectural decisions, expand scope, perform unrelated refactoring, or fix review findings without a new Planner decision. If safe compliance is impossible, it reports the blocker.
 
 ### Reviewer
 
@@ -52,12 +52,11 @@ one task = one repository = one branch = one worktree = one diff
 
 The primary/root Planner may commit on the existing branch or push only with explicit user authorization. Workers, Reviewers, and other sub-agents must not commit or push.
 
-All agents may inspect Git state with read-only commands such as `git status`, `git diff`, `git diff --stat`, `git rev-parse`, and `git log`. No agent may create or switch branches, repair repository state, create or remove worktrees, or run:
+Creating, deleting, renaming, or switching branches is forbidden by default. A branch operation is allowed only when the user explicitly requests that specific operation and the Planner approves it. Only the primary/root Planner may execute the exact approved operation; Workers, Reviewers, and other sub-agents must never perform branch operations. This exception does not authorize any other repository-state change.
+
+All agents may inspect Git state with read-only commands such as `git status`, `git diff`, `git diff --stat`, `git rev-parse`, and `git log`. Without the exact exception above, no agent may use any branch-creating, branch-deleting, branch-renaming, or branch-switching form of `git checkout`, `git switch`, or `git branch`. No agent may repair repository state, create or remove worktrees, or run:
 
 ```text
-git checkout
-git switch
-git branch -m
 git worktree add
 git worktree remove
 git pull
@@ -93,6 +92,12 @@ Never store secrets in `SWAP.md`; reconcile it with live Git and repository stat
 The Worker modifies only allowed files. Without Planner approval, do not introduce unrelated refactoring or formatting, dependency or lockfile changes, generated or configuration changes, public API or architecture changes, file moves or renames, or weakened tests.
 
 Prefer existing mechanisms and modification over new abstractions or regeneration. Execute serially by default. The Planner may approve parallel work only when files, generated outputs, dependencies, and shared configuration cannot overlap.
+
+## Design Before Implementation
+
+The Planner must not rush into implementation. Before the Worker writes code, the Planner first understands the relevant system and existing conventions, then defines the intended end state, boundaries and invariants, rough overall design, and code-quality or code-taste bar. The task contract must give the Worker enough direction to implement that design without making architectural decisions.
+
+Implement incrementally toward the planned end state. Time pressure is never a reason to stack patchwork fixes or erode coherence. If execution shows that the design is incomplete or invalid, the Worker stops and reports the finding so the Planner can revise the plan before further code changes. A minimal diff means the smallest coherent solution, not merely the fewest changed lines.
 
 ## Stop Conditions
 
