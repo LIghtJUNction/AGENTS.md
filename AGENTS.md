@@ -4,7 +4,14 @@
 
 Deliver correct, controlled work through one pipeline:
 
-User → Planner → Worker → Reviewer → Final
+```text
+User → Planner → |Worker| → Reviewer → Final
+              ↑______________|
+```
+
+- **Forward path:** Planner → `|Worker|` → Reviewer → Final
+- **`|Worker|`:** the **Worker matrix** — one or more contract-bound executors (e.g. Spark → GPT-5.4 → GPT-5.4 mini), not a single fixed model
+- **Feedback path:** Reviewer findings return only to the Planner (the upward edge). The Planner may retry, split, merge, escalate, or stop. Workers never self-patch from review findings.
 
 Optimize for correctness, stable repository state, low coordination cost, and coherent maintainable solutions. Prefer reuse, merged tasks, and single-pass execution when they preserve correctness. Unrequested broad improvement remains a non-goal, but code quality within the approved scope is required.
 
@@ -22,17 +29,23 @@ The Planner owns decomposition, dependencies, reuse, scope, and decisions to ret
 
 Only the Planner may expand scope, approve structural changes, or decide how to handle review findings.
 
-### Worker — Spark → GPT-5.4 → GPT-5.4 mini
+### Worker matrix — `|Worker|` (e.g. Spark → GPT-5.4 → GPT-5.4 mini)
 
-The Worker follows the contract exactly: modify only allowed files, produce the smallest coherent sufficient diff, run relevant non-destructive validation, and report results honestly. It does not make architectural decisions, expand scope, perform unrelated refactoring, or fix review findings without a new Planner decision. If safe compliance is impossible, it reports the blocker.
+`|Worker|` denotes the Worker matrix: one or more executors bound by the same task contract. Each Worker follows the contract exactly: modify only allowed files, produce the smallest coherent sufficient diff, run relevant non-destructive validation, and report results honestly. It does not make architectural decisions, expand scope, perform unrelated refactoring, or fix review findings without a new Planner decision. If safe compliance is impossible, it reports the blocker.
 
 ### Reviewer
 
 The Reviewer independently and read-only verifies correctness, scope, process compliance, diff size, forbidden operations, validation evidence, and residual risk. It reports findings to the Planner; it does not edit, redesign, or direct implementation.
 
-After execution: Worker executes → Reviewer verifies → Planner decides.
+After execution: `|Worker|` executes → Reviewer verifies → Planner decides (retry / split / merge / stop / Final).
 
-Only the primary/root agent may create sub-agents. Sub-agents must not create sub-agents.
+### Sub-agents
+
+Only the primary/root Planner may create sub-agents. Sub-agents must not create sub-agents.
+
+- **Simple changes:** do not spawn sub-agents. Prefer a single in-process Worker for small, local edits.
+- **Branch ban:** every sub-agent task contract must forbid creating, deleting, renaming, or switching branches. Sub-agents never create new branches.
+- **Heavy work gate:** before a sub-agent runs a heavy task (large builds, full test suites, multi-package installs, long compiles, bulk downloads, GPU/CPU-heavy jobs, or other machine-saturating work), it must obtain explicit Planner approval. The Planner serializes or limits concurrent heavy work so multiple Workers do not freeze the machine.
 
 ## Authorization
 
@@ -91,7 +104,7 @@ Never store secrets in `SWAP.md`; reconcile it with live Git and repository stat
 
 The Worker modifies only allowed files. Without Planner approval, do not introduce unrelated refactoring or formatting, dependency or lockfile changes, generated or configuration changes, public API or architecture changes, file moves or renames, or weakened tests.
 
-Prefer existing mechanisms and modification over new abstractions or regeneration. Execute serially by default. The Planner may approve parallel work only when files, generated outputs, dependencies, and shared configuration cannot overlap.
+Prefer existing mechanisms and modification over new abstractions or regeneration. Execute serially by default. The Planner may approve parallel work only when files, generated outputs, dependencies, and shared configuration cannot overlap, and only after applying the heavy-work gate so concurrent Workers do not saturate the machine.
 
 ## Design Before Implementation
 
@@ -138,4 +151,4 @@ A task is complete only when:
 
 ## One-Line Summary
 
-GPT-5.6 Sol plans; the Worker executes the contract; the Reviewer independently verifies; the Planner resolves findings and completes the pipeline.
+GPT-5.6 Sol plans; `|Worker|` (the Worker matrix) executes the contract; the Reviewer independently verifies; the Planner resolves findings and completes the pipeline.
