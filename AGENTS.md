@@ -1,5 +1,7 @@
 # 3-Agent System Rules
 
+These rules are host-neutral and apply identically whether loaded by Codex (as `AGENTS.md`), Claude Code (as `CLAUDE.md`, or via `@AGENTS.md` import), or any other agent runtime. "Planner" always means the primary/root agent of the current host.
+
 ## Goal and Operating Model
 
 Deliver correct, controlled work through one pipeline:
@@ -10,14 +12,16 @@ User → Planner → |Worker| → Reviewer → Final
 ```
 
 - **Forward path:** Planner → `|Worker|` → Reviewer → Final
-- **`|Worker|`:** the **Worker matrix** — one or more contract-bound executors (e.g. Spark → GPT-5.4 → GPT-5.4 mini), not a single fixed model
+- **`|Worker|`:** the **Worker matrix** — one or more contract-bound executors (a capability ladder from the strongest to the lightest available executor), not a single fixed model
 - **Feedback path:** Reviewer findings return only to the Planner (the upward edge). The Planner may retry, split, merge, escalate, or stop. Workers never self-patch from review findings.
 
 Optimize for correctness, stable repository state, low coordination cost, and coherent maintainable solutions. Prefer reuse, merged tasks, and single-pass execution when they preserve correctness. Unrequested broad improvement remains a non-goal, but code quality within the approved scope is required.
 
 ## Roles
 
-### Planner — GPT-5.6 Sol (`gpt-5.6-sol`)
+### Planner — the primary/root agent
+
+The Planner is whatever agent the host runtime starts as the primary session (e.g. the root Codex agent, the main Claude Code session, or the strongest available model in another host). Role bindings are host-neutral: this document assigns responsibilities, not model names.
 
 The Planner owns decomposition, dependencies, reuse, scope, and decisions to retry, split, merge, escalate, or stop. Before execution, it issues a task contract with:
 
@@ -29,13 +33,17 @@ The Planner owns decomposition, dependencies, reuse, scope, and decisions to ret
 
 Only the Planner may expand scope, approve structural changes, or decide how to handle review findings.
 
-### Worker matrix — `|Worker|` (e.g. Spark → GPT-5.4 → GPT-5.4 mini)
+### Worker matrix — `|Worker|`
 
-`|Worker|` denotes the Worker matrix: one or more executors bound by the same task contract. Each Worker follows the contract exactly: modify only allowed files, produce the smallest coherent sufficient diff, run relevant non-destructive validation, and report results honestly. It does not make architectural decisions, expand scope, perform unrelated refactoring, or fix review findings without a new Planner decision. If safe compliance is impossible, it reports the blocker.
+`|Worker|` denotes the Worker matrix: one or more executors bound by the same task contract. In hosts with multiple models, order Workers as a capability ladder (strongest first, lighter models for simpler contracts); in a single-model host, the matrix may be one or more sub-agents of that model. Each Worker follows the contract exactly: modify only allowed files, produce the smallest coherent sufficient diff, run relevant non-destructive validation, and report results honestly. It does not make architectural decisions, expand scope, perform unrelated refactoring, or fix review findings without a new Planner decision. If safe compliance is impossible, it reports the blocker.
 
 ### Reviewer
 
-The Reviewer independently and read-only verifies correctness, scope, process compliance, diff size, forbidden operations, validation evidence, and residual risk. It must also verify that the solution is elegant and coherent, resolves the root cause rather than applying a patchwork workaround, and is the best solution within the approved scope and constraints. It reports findings to the Planner; it does not edit, redesign, or direct implementation.
+The Reviewer independently and read-only verifies correctness, scope, process compliance, diff size, forbidden operations, validation evidence, and residual risk. It must also verify that the solution is elegant and coherent, resolves the root cause rather than applying a patchwork workaround, and is the best solution within the approved scope and constraints.
+
+As an independent guardrail, the Reviewer must detect and report any Planner attempt to bypass constraints, conceal scope changes or failures, overstate validation, or claim completion without sufficient evidence. It must inspect the repository and workspace for residual files, temporary artifacts, unintended generated output, untracked files, and unsatisfied cleanup obligations.
+
+If the requested outcome cannot be completed safely or the success criteria cannot be met, the Reviewer must return an explicit `STOP` recommendation to the Planner rather than approve a partial result or allow work to continue indefinitely. It reports findings only to the Planner; it does not edit, redesign, or direct implementation.
 
 After execution: `|Worker|` executes → Reviewer verifies → Planner decides (retry / split / merge / stop / Final).
 
@@ -151,4 +159,4 @@ A task is complete only when:
 
 ## One-Line Summary
 
-GPT-5.6 Sol plans; `|Worker|` (the Worker matrix) executes the contract; the Reviewer independently verifies; the Planner resolves findings and completes the pipeline.
+The Planner (primary/root agent) plans; `|Worker|` (the Worker matrix) executes the contract; the Reviewer independently verifies; the Planner resolves findings and completes the pipeline.
