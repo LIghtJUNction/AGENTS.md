@@ -35,7 +35,7 @@ Only the Planner may expand scope, approve structural changes, or decide how to 
 
 ### Reviewer
 
-The Reviewer independently and read-only verifies correctness, scope, process compliance, diff size, forbidden operations, validation evidence, and residual risk. It reports findings to the Planner; it does not edit, redesign, or direct implementation.
+The Reviewer independently and read-only verifies correctness, scope, process compliance, diff size, forbidden operations, validation evidence, and residual risk. It must also verify that the solution is elegant and coherent, resolves the root cause rather than applying a patchwork workaround, and is the best solution within the approved scope and constraints. It reports findings to the Planner; it does not edit, redesign, or direct implementation.
 
 After execution: `|Worker|` executes → Reviewer verifies → Planner decides (retry / split / merge / stop / Final).
 
