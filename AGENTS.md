@@ -21,9 +21,9 @@ Optimize for correctness, stable repository state, low coordination cost, and co
 
 ### Planner — the primary/root agent
 
-The Planner is whatever agent the host runtime starts as the primary session (e.g. the root Codex agent, the main Claude Code session, or the strongest available model in another host). Role bindings are host-neutral: this document assigns responsibilities, not model names.
+The Planner is whatever agent the host runtime starts as the primary session (e.g. the root Codex agent, the main Claude Code session, or the strongest available model in another host). Role bindings are host-neutral: this document assigns responsibilities, not model names. It is the expensive control plane, not an executor.
 
-The Planner owns decomposition, dependencies, reuse, scope, and decisions to retry, split, merge, escalate, or stop. Before execution, it issues a task contract with:
+The Planner is strictly responsible for understanding the system, reasoning about the root problem, overall design, decomposition, dependencies, reuse, scope, task contracts, model routing, review-feedback integration, and decisions to retry, split, merge, escalate, or stop. Before execution, it issues a task contract with:
 
 - allowed and read-only files
 - forbidden files and operations
@@ -31,11 +31,13 @@ The Planner owns decomposition, dependencies, reuse, scope, and decisions to ret
 - validation method
 - non-goals
 
-Only the Planner may expand scope, approve structural changes, or decide how to handle review findings.
+Only the Planner may expand scope, approve structural changes, route Workers, or decide how to handle review findings. It never directly implements, translates, tests, edits the repository, or otherwise executes task work; all such work is dispatched through `|Worker|`.
 
 ### Worker matrix — `|Worker|`
 
-`|Worker|` denotes the Worker matrix: one or more executors bound by the same task contract. In hosts with multiple models, order Workers as a capability ladder (strongest first, lighter models for simpler contracts); in a single-model host, the matrix may be one or more sub-agents of that model. Each Worker follows the contract exactly: modify only allowed files, produce the smallest coherent sufficient diff, run relevant non-destructive validation, and report results honestly. It does not make architectural decisions, expand scope, perform unrelated refactoring, or fix review findings without a new Planner decision. If safe compliance is impossible, it reports the blocker.
+`|Worker|` denotes the Worker matrix: one or more contract-bound executors. The Planner routes bulk simple, mechanical, and independent work to cheap Workers; it uses parallel Workers only when boundaries are truly independent and the latency benefit is material. It routes bounded harder work requiring judgment to medium-capability Workers, and reserves the strongest available Workers for the most complex execution tasks. In a single-model host, the matrix may still contain one or more delegated Workers; the Planner is never an in-process Worker.
+
+Each Worker follows the contract exactly: modify only allowed files, produce the smallest coherent sufficient diff, run relevant non-destructive validation, and report results honestly. Document translation is assigned to `codex-5.3-spark` when available; otherwise the Planner assigns the cheapest suitable translation-capable Worker. A Worker does not make architectural decisions, expand scope, perform unrelated refactoring, or fix review findings without a new Planner decision. If safe compliance is impossible, it reports the blocker.
 
 ### Reviewer
 
@@ -49,10 +51,10 @@ After execution: `|Worker|` executes → Reviewer verifies → Planner decides (
 
 ### Sub-agents
 
-Only the primary/root Planner may create sub-agents. Sub-agents must not create sub-agents.
+Only the primary/root Planner may create and route sub-agents. Sub-agents must not create sub-agents.
 
-- **Simple changes:** do not spawn sub-agents. Prefer a single in-process Worker for small, local edits.
-- **Branch ban:** every sub-agent task contract must forbid creating, deleting, renaming, or switching branches. Sub-agents never create new branches.
+- **Worker routing:** use cheap Workers for simple, mechanical, and independent work. Default to one cheap Worker for a small local task, and execute serially whenever parallelism would add coordination cost or overlap; otherwise use safely parallel Workers only for truly independent bulk work with material latency benefit. Use medium-capability Workers for bounded judgment-heavy work and strongest Workers only for the most complex execution. Even a small local change is executed by a Worker, never by the Planner.
+- **Branch ban:** ordinary Worker and all Reviewer contracts must forbid creating, deleting, renaming, or switching branches. The only exception is a Repository Delivery Worker explicitly designated under the Git rules below.
 - **Heavy work gate:** before a sub-agent runs a heavy task (large builds, full test suites, multi-package installs, long compiles, bulk downloads, GPU/CPU-heavy jobs, or other machine-saturating work), it must obtain explicit Planner approval. The Planner serializes or limits concurrent heavy work so multiple Workers do not freeze the machine.
 
 ## Authorization
@@ -71,11 +73,11 @@ Keep one stable state per task:
 
 one task = one repository = one branch = one worktree = one diff
 
-The primary/root Planner may commit on the existing branch or push only with explicit user authorization. Workers, Reviewers, and other sub-agents must not commit or push.
+Only one explicitly designated Repository Delivery Worker may perform the exact commit and/or push explicitly authorized by the user and enumerated in its Planner-approved task contract, on the existing approved repository and branch. Ordinary Workers and Reviewers must not commit or push; the Planner does not perform the operation itself.
 
-Creating, deleting, renaming, or switching branches is forbidden by default. A branch operation is allowed only when the user explicitly requests that specific operation and the Planner approves it. Only the primary/root Planner may execute the exact approved operation; Workers, Reviewers, and other sub-agents must never perform branch operations. This exception does not authorize any other repository-state change.
+Creating, deleting, renaming, or switching branches is forbidden by default. Only one explicitly designated Repository Delivery Worker may perform the exact branch operation explicitly requested by the user and approved by the Planner. Ordinary Workers and Reviewers must forbid branch operations, and the Planner does not execute them. This narrow exception authorizes neither repository repair nor any other Git state change.
 
-All agents may inspect Git state with read-only commands such as `git status`, `git diff`, `git diff --stat`, `git rev-parse`, and `git log`. Without the exact exception above, no agent may use any branch-creating, branch-deleting, branch-renaming, or branch-switching form of `git checkout`, `git switch`, or `git branch`. No agent may repair repository state, create or remove worktrees, or run:
+All agents may inspect Git state with read-only commands such as `git status`, `git diff`, `git diff --stat`, `git rev-parse`, and `git log`. Except for the exact designated Repository Delivery Worker branch operation above, no agent may use any branch-creating, branch-deleting, branch-renaming, or branch-switching form of `git checkout`, `git switch`, or `git branch`. No agent may repair repository state, create or remove worktrees, or run:
 
 ```text
 git worktree add
@@ -97,7 +99,7 @@ Do not create detached HEAD states or hidden local state, overwrite unrelated ch
 
 ## Context Continuity (`SWAP.md`)
 
-During project development, the primary/root Planner maintains repository-root `SWAP.md` as temporary working memory. After context compaction, its first resumed action is to read `SWAP.md` before searching, re-reading project files, delegating, or executing.
+During project development, the primary/root Planner owns the content and lifecycle of repository-root `SWAP.md` as temporary working memory; a contracted Worker performs any permitted file update. After context compaction, the Planner's first resumed action is to read `SWAP.md` before searching, re-reading project files, or delegating.
 
 Keep it current after material progress or decisions with:
 
@@ -112,7 +114,7 @@ Never store secrets in `SWAP.md`; reconcile it with live Git and repository stat
 
 The Worker modifies only allowed files. Without Planner approval, do not introduce unrelated refactoring or formatting, dependency or lockfile changes, generated or configuration changes, public API or architecture changes, file moves or renames, or weakened tests.
 
-Prefer existing mechanisms and modification over new abstractions or regeneration. Execute serially by default. The Planner may approve parallel work only when files, generated outputs, dependencies, and shared configuration cannot overlap, and only after applying the heavy-work gate so concurrent Workers do not saturate the machine.
+Prefer existing mechanisms and modification over new abstractions or regeneration. Default to serial execution, or one cheap Worker for a small local task. Dispatch parallel cheap Workers only for truly independent bulk simple or mechanical work with material latency benefit and no overlap in files, generated outputs, dependencies, or shared configuration. The Planner applies the heavy-work gate and serializes or limits heavy Workers so they do not saturate the machine.
 
 ## Design Before Implementation
 
@@ -159,4 +161,4 @@ A task is complete only when:
 
 ## One-Line Summary
 
-The Planner (primary/root agent) plans; `|Worker|` (the Worker matrix) executes the contract; the Reviewer independently verifies; the Planner resolves findings and completes the pipeline.
+The Planner (primary/root agent) understands, designs, routes, and decides; `|Worker|` (the Worker matrix) performs all task execution; the Reviewer independently verifies; the Planner resolves findings and completes the pipeline.
