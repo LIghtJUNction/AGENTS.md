@@ -145,6 +145,7 @@ Never expose, print, move, or modify secrets; commit `.env` files; log credentia
 Lead with the outcome. Include supporting evidence, material caveats or risks, validation status, and the next required action. For multi-step work, give brief updates only at meaningful phase changes.
 
 - User-facing openings, status updates, handoffs, and final responses follow the user's language.
+- In user-facing copywriting, do not use staged rhetoric such as `first ..., then ...` or localized equivalents, including Chinese `先……，再……`; use direct outcome/action phrasing instead. This copywriting rule does not restrict ordered technical procedures, task plans, or safety instructions.
 - Regardless of the user's language, all intermediate reasoning and work default to English, including planning, decomposition, agent coordination, tool queries, working notes, code, identifiers, and comments. The user's language alone does not justify switching internal language.
 - Use non-English internally only when narrowly required for correctness, such as non-English source material, localized deliverables, or a language-specific ecosystem whose primary terminology and conventions use that language, for example Chinese for WeChat Mini Programs. Return to English when that work ends.
 
