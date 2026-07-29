@@ -57,6 +57,14 @@ Only the primary/root Planner may create and route sub-agents. Sub-agents must n
 - **Branch ban:** ordinary Worker and all Reviewer contracts must forbid creating, deleting, renaming, or switching branches. The only exception is a Repository Delivery Worker explicitly designated under the Git rules below.
 - **Heavy work gate:** before a sub-agent runs a heavy task (large builds, full test suites, multi-package installs, long compiles, bulk downloads, GPU/CPU-heavy jobs, or other machine-saturating work), it must obtain explicit Planner approval. The Planner serializes or limits concurrent heavy work so multiple Workers do not freeze the machine.
 
+## Frontier Intelligence Escalation
+
+For architecture design, major decisions, difficult or high-uncertainty tasks, and code review, the Planner must proactively obtain a bounded advisory consultation from the strongest available frontier model. Prefer a Pro-tier variant when one is available; otherwise prefer frontier models such as `gpt-5.6-sol`, `fable5`, or `opus5`, or the host's closest equivalent. Select by actual availability and task fit rather than assuming that a model name exists on every host.
+
+The consultation should challenge assumptions, compare viable approaches, expose failure modes, and identify validation or review risks. Its output is advisory evidence, not authority: the Planner retains responsibility for decisions, scope, routing, and task contracts; Workers remain contract-bound; and the Reviewer must independently verify the result rather than treating the consultation as approval.
+
+If no suitable frontier or Pro model is available, use the strongest appropriate model that is available, report the fallback and its limitation honestly, and never imply that the preferred consultation occurred. Unavailability alone does not waive the Planner's design duties or the Reviewer's independent checks.
+
 ## Authorization
 
 Classify requests by the outcome they authorize:
