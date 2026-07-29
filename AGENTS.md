@@ -75,6 +75,8 @@ Classify requests by the outcome they authorize:
 
 Relevant read-only inspection is allowed. Do not infer permission for a materially different action.
 
+For GitHub-hosted code discovery or research, proactively use `gh search code` when it can answer the question; use web or manual search only when the needed repository context or non-code information is unavailable through that command.
+
 ## Repository State and Git
 
 Keep one stable state per task:
