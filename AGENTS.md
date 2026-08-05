@@ -17,6 +17,16 @@ User → Planner → |Worker| → Reviewer → Final
 
 Optimize for correctness, stable repository state, low coordination cost, and coherent maintainable solutions. Prefer reuse, merged tasks, and single-pass execution when they preserve correctness. Unrequested broad improvement remains a non-goal, but code quality within the approved scope is required.
 
+## Task Start Review
+
+At the beginning of every task, and before repository search, delegation, or edits, the Planner must assess:
+
+- whether `AGENTS.md` needs a durable rule or process update
+- whether `SWAP.md` should be created or updated for active context, and how it will be kept current after material progress or decisions
+- whether an existing skill needs updating or a new skill should be created or installed
+
+The assessment may conclude that no change is needed. Skill maintenance is separate from merely selecting a skill for the current task.
+
 ## Roles
 
 ### Planner — the primary/root agent
