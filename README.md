@@ -1,27 +1,36 @@
 # AGENTS.md
 
-A compact global policy for coding agents. It keeps routine work fast while preserving stronger review for changes that actually carry risk.
+A 59-token opt-in policy that teaches coding agents to filter large, repetitive context without adding a process to ordinary tasks.
 
-## Design
+It intentionally does not repeat the model's built-in coding, testing, Git, or safety behavior. Every permanent instruction consumes context on every task, so this file contains only the behavior being added.
 
-- **Proportional workflow:** small, well-scoped changes can be handled directly; ambiguous or cross-cutting work gets more planning.
-- **Risk-based delegation:** subagents and independent reviewers are used when they materially improve quality or latency.
-- **Controlled scope:** preserve unrelated work and avoid unrequested dependency, configuration, API, or architecture changes.
-- **Evidence before completion:** run relevant checks, inspect the final diff, and report validation and residual risk honestly.
-- **Git and security safety:** destructive operations, external writes, branch changes, and secret handling require explicit authority.
+## When to use it
 
-Project- or directory-level `AGENTS.md` files remain the right place for repository layout, build commands, test commands, and local conventions.
+Install it globally when work commonly includes long logs, repeated tool output, incident histories, or specifications with superseded decisions.
+
+Use no global `AGENTS.md` when most tasks are short and the absolute lowest fixed input cost matters. The controlled benchmark below found that zero custom preset remained the best aggregate baseline; the 59-token policy helped specifically on noisy input.
 
 ## Benchmark
 
-The policy was refined through four clean runs of the same real code task against `proxy-from-env@1.1.0`: adding dependency-free IPv4 CIDR support to `NO_PROXY` with public tests, lint, and a separate 16-case evaluator.
+Each cell is one clean run of the same real task against `proxy-from-env@1.1.0`: add dependency-free IPv4 CIDR support to `NO_PROXY`, update tests and documentation, and pass lint plus a separate 16-case evaluator.
 
-| Version | Policy tokens* | Agent turns | Time | Independent checks |
-| --- | ---: | ---: | ---: | ---: |
-| Original strict pipeline | 3,028 | 5 | 417 s | 16/16 after review follow-up |
-| Optimized policy | 689 | 1 | 96 s | 16/16 |
+- **Short:** requirements were already compact and authoritative.
+- **Noisy:** the same final requirements were embedded in a 178 KB, 2,426-line incident bundle containing repetition and superseded proposals.
+- Every run used the same model and reasoning setting, started from the same source, and could edit only `index.js`, `test.js`, and `README.md`.
+- **Zero preset** means no user-supplied `AGENTS.md`. Runtime system/developer instructions still exist and cannot be removed.
 
-\*Local tokenizer estimate; this is not billed-token telemetry.
+| Custom preset | Estimated tokens* | Short time | Short public tests | Short diff | Noisy time | Noisy public tests | Noisy diff |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| None (baseline) | 0 | **87.6 s** | 167 | +89/-3 | 150.3 s | 165 | +93/-3 |
+| Broad context policy | 721 | 111.9 s | 167 | **+70/-2** | 183.9 s | **170** | +99/-5 |
+| Focused context policy | 176 | 146.3 s | 166 | +143/-25 | **110.5 s** | 168 | +91/-4 |
+| Minimal conditional policy (current) | 59 | 127.7 s | 167 | +111/-6 | 125.9 s | 166 | **+84/-3** |
+
+All eight runs passed 16/16 independent checks, the repository test suite, lint, and `git diff --check`.
+
+On the noisy workload, the current policy was 16.2% faster than no preset and produced a 9.4% smaller diff by changed lines. Across both single runs, no preset had the lowest total wall time. The 59-token version is therefore a targeted tradeoff, not a claim that more prompting always helps.
+
+\*Token counts are local tokenizer estimates for the policy file, not billed-token telemetry. Wall-clock results are single-run observations and include sampling/runtime variance; repeat them before treating small differences as universal.
 
 ## Install
 
