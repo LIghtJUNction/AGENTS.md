@@ -1,73 +1,82 @@
-# Empty AGENTS.md
+# Minimal AGENTS.md
 
-This repository intentionally keeps `AGENTS.md` empty and tracked by Git. No `.gitkeep` is needed because Git already tracks the file itself.
+A one-line global policy that produced the best observed balance of speed, change size, and correctness in the repository benchmark:
 
-## Result
+```text
+Inspect first. Make the smallest correct change. Verify it, then stop.
+```
 
-For the tested coding workload, no user-supplied global prompt was the best default:
+The policy is approximately 15 tokens. It does not repeat built-in safety, Git, testing, or coding behavior.
 
-- **Lowest fixed prompt cost:** 0 custom tokens.
-- **Best paired total time:** 237.9 seconds across the short and noisy tasks.
-- **Best repeated noisy-task median:** 134.8 seconds across three clean runs.
-- **No quality loss:** every zero-preset run passed all 16 independent checks, the repository test suite, lint, and `git diff --check`.
+## Current result
 
-Additional global instructions did not produce a repeatable quality improvement. Some single runs were faster or smaller, but those gains did not survive broader or repeated comparison.
+Nine clean paired runs compared the one-line policy with no user-supplied `AGENTS.md` across three behavior-changing tasks in real npm packages.
+
+- **Correctness:** both configurations passed 144/144 independent hidden checks; all repository tests and `git diff --check` runs passed.
+- **Median wall time across all runs:** 45.0 seconds with the policy versus 61.1 seconds empty, a 26.4% reduction.
+- **Aggregate wall time:** 504.9 seconds with the policy versus 553.2 seconds empty, an 8.7% reduction.
+- **Changed lines:** 464 with the policy versus 586 empty, a 20.8% reduction. The policy produced a smaller diff in eight pairs and tied once.
+- **Paired speed:** the policy was faster in seven pairs and slower in two.
+
+The speed result is promising, not universal proof. Nine runs are still a small sample, wall time includes service variance, and the 7-2 speed split has a one-sided sign-test p-value of about 0.09. The diff-size result was more consistent.
 
 ## Method
-
-The benchmark used a real package, `proxy-from-env@1.1.0`, and one behavior-changing task: add dependency-free IPv4 CIDR support to `NO_PROXY`, update focused tests and documentation, and preserve existing behavior.
 
 Every run:
 
 - used GPT-5.6 Terra at medium reasoning;
-- started from the same clean source;
-- could edit only `index.js`, `test.js`, and `README.md`;
-- was completed by one coding agent with no nested delegation;
-- was checked by the repository test suite, lint, `git diff --check`, and a separate 16-case evaluator.
+- started from the same clean package source;
+- received the same task requirements within its pair;
+- used one coding agent with no nested delegation;
+- was evaluated by the original test suite, `git diff --check`, and a separate 16-case hidden evaluator.
 
-Two input shapes were tested:
+The candidate condition added only the one-line global policy. The empty condition had no user-supplied `AGENTS.md`; runtime system and developer instructions still existed.
 
-- **Short:** compact, authoritative requirements.
-- **Noisy:** the final requirements embedded in a 178 KB, 2,426-line incident bundle with repetition and superseded proposals.
+## New paired benchmark
 
-“Zero preset” means no user-supplied `AGENTS.md`. Runtime system and developer instructions still exist.
+| Package and task | Configuration | Times | Median | Median changed lines | Hidden checks |
+| --- | --- | --- | ---: | ---: | ---: |
+| `json-stable-stringify@1.0.2`: array replacer | Empty | 63.7, 42.7, 61.1 s | 61.1 s | 62 | 48/48 |
+|  | One-line policy | 44.4, 63.1, 45.0 s | **45.0 s** | **48** | 48/48 |
+| `wordwrap@1.0.0`: Unicode code points | Empty | 49.7, 51.9, 80.7 s | 51.9 s | 50 | 48/48 |
+|  | One-line policy | 43.3, 40.0, 41.4 s | **41.4 s** | **30** | 48/48 |
+| `proxy-from-env@1.1.0`: IPv4 CIDR | Empty | 52.4, 76.9, 74.2 s | 74.2 s | 97 | 48/48 |
+|  | One-line policy | 46.7, 111.8, 69.2 s | **69.2 s** | **68** | 48/48 |
 
-## Paired short and noisy runs
+The second `proxy-from-env` policy run is the clearest warning against reading too much into one sample: it took 111.8 seconds while its paired empty run took 76.9 seconds. Repetition changed the conclusion from a single-run claim to a median-based result.
 
-| Global preset | Estimated policy tokens* | Short time | Noisy time | Combined time | Independent checks |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| None | **0** | **87.6 s** | 150.3 s | **237.9 s** | 32/32 |
-| Broad context policy | 721 | 111.9 s | 183.9 s | 295.8 s | 32/32 |
-| Focused context policy | 176 | 146.3 s | **110.5 s** | 256.8 s | 32/32 |
-| Minimal conditional policy | 59 | 127.7 s | 125.9 s | 253.6 s | 32/32 |
+## Earlier rejected policies
 
-The 176-token policy produced the fastest single noisy run, but it regressed the short task enough to lose overall. All four configurations had the same hidden-test result.
+An earlier benchmark used a compact and a 178 KB noisy version of the same `proxy-from-env` task. Every configuration passed its hidden checks, but the empty preset had the best paired total time.
 
-## Repeated noisy-input confirmation
+| Global preset | Estimated tokens | Short time | Noisy time | Combined time |
+| --- | ---: | ---: | ---: | ---: |
+| Empty | **0** | **87.6 s** | 150.3 s | **237.9 s** |
+| Broad context policy | 721 | 111.9 s | 183.9 s | 295.8 s |
+| Focused context policy | 176 | 146.3 s | **110.5 s** | 256.8 s |
+| Minimal conditional policy | 59 | 127.7 s | 125.9 s | 253.6 s |
 
-| Global preset | Runs | Times | Median | Public test counts | Changed lines | Independent checks |
-| --- | ---: | --- | ---: | --- | --- | --- |
-| None | 3 | 150.3, 125.1, 134.8 s | **134.8 s** | 165, 171, 168 | 96, 86, 91 | 16/16 each |
-| 25-token reread limit | 2 | 155.2, 158.6 s | 156.9 s | 168, 167 | 83, 77 | 16/16 each |
-| 42-token search-first policy | 1 | 186.8 s | 186.8 s | 168 | 92 | 16/16 |
-| 44-token working-set policy | 1 | 149.6 s | 149.6 s | 168 | 97 | 16/16 |
+Repeated noisy-input runs also rejected three shorter policies:
 
-The shortest tested rule was still 16.4% slower by median than zero preset. Its smaller diff did not come with a hidden-test advantage.
+| Global preset | Runs | Times | Median | Hidden checks |
+| --- | ---: | --- | ---: | ---: |
+| Empty | 3 | 150.3, 125.1, 134.8 s | **134.8 s** | 16/16 each |
+| 25-token reread limit | 2 | 155.2, 158.6 s | 156.9 s | 16/16 each |
+| 42-token search-first policy | 1 | 186.8 s | 186.8 s | 16/16 |
+| 44-token working-set policy | 1 | 149.6 s | 149.6 s | 16/16 |
+
+Those failures are why the current rule contains no context-management process, delegation policy, or general workflow. It only reinforces inspection, minimality, verification, and stopping.
 
 ## Decision
 
-Keep the global `AGENTS.md` empty. Add repository- or task-specific instructions only when they correct a measured failure that the base agent does not already handle.
+The one-line policy is the current benchmark champion and is now stored in `AGENTS.md`.
 
-This avoids paying prompt tokens and workflow overhead on every task for behavior already supplied by the model and runtime.
+It costs about 15 fixed input tokens rather than zero. Actual billed-token telemetry was unavailable, so the repository does not claim a measured total-token reduction. Keep the file empty when absolute minimum fixed prompt cost matters more than the observed speed and diff-size gains.
 
-## Use
-
-Download the tracked empty file:
+## Install
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/LIghtJUNction/AGENTS.md/main/AGENTS.md -o ~/.codex/AGENTS.md
 ```
 
-Leaving the global file absent has the same prompting effect.
-
-\*Policy token counts are local tokenizer estimates, not billed-token telemetry. Wall-clock measurements include model and runtime variance; the repeated runs reduce this uncertainty but do not establish a universal result for every repository or model.
+Token counts are local estimates. Wall-clock results include model, runtime, and service variance; results may change with other models, repositories, tools, or task distributions.
